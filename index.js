@@ -2,7 +2,7 @@ const express = require('express');
 const app = express()
 const cors = require('cors')
 const dotenv = require('dotenv')
-const { MongoClient, ServerApiVersion } = require('mongodb');
+const { MongoClient, ServerApiVersion, ObjectId } = require('mongodb');
 dotenv.config();
 
 app.use(cors())
@@ -44,6 +44,12 @@ async function run() {
     app.post("/books", async (req, res) => {
       const newBook = req.body;
 
+      if (newBook) {
+        newBook.isPublished = false;
+        newBook.currentStatus = "pending";
+        newBook.createdAt = new Date()
+      }
+
       try {
         const result = await bookCollection.insertOne(newBook);
         res.status(201).send(result);
@@ -53,9 +59,44 @@ async function run() {
       }
     });
 
-    app.get("/books", async (req, res) => {
+    app.patch("/books/:id", async (req, res) => {
+      const { id } = req.params
+      const { status } = req.body;
+
+      let newStatus = ""
+
+      if (status == "publish") {
+        newStatus = true
+      }
+      else {
+        newStatus = false
+      }
+      const filter = { _id: new ObjectId(id) }
+      const update = {
+        $set: {
+          isPublished: newStatus
+        }
+      }
+
       try {
-        const result = await bookCollection.find().toArray();
+        const result = await bookCollection.updateOne(filter, update)
+        res.status(201).send(result);
+      }
+      catch (error) {
+        console.error(error);
+        res.status(500).send({ message: "Failed to add book" });
+      }
+    })
+
+    app.get("/books", async (req, res) => {
+
+      const query = {};
+
+      if (req.query.librarianId) {
+        query.librarianId = req.query.librarianId
+      }
+      try {
+        const result = await bookCollection.find(query).toArray();
         res.send(result);
       } catch (error) {
         console.error(error);
