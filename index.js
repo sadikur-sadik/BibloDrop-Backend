@@ -87,6 +87,24 @@ async function run() {
         res.status(500).send({ message: "Failed to add book" });
       }
     })
+    app.patch("/booksUpdate/:id", async (req, res) => {
+      const { id } = req.params
+      const updateInfo= req.body;
+      
+      const filter = { _id: new ObjectId(id) }
+      const update = {
+        $set: updateInfo
+      }
+
+      try {
+        const result = await bookCollection.updateOne(filter, update)
+        res.status(201).send(result);
+      }
+      catch (error) {
+        console.error(error);
+        res.status(500).send({ message: "Failed to add book" });
+      }
+    })
 
     app.delete("/books/:id", async (req, res) => {
       const { id } = req.params
