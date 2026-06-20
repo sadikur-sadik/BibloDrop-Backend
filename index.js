@@ -88,6 +88,20 @@ async function run() {
       }
     })
 
+    app.delete("/books/:id", async (req, res) => {
+      const { id } = req.params
+      const filter = { _id: new ObjectId(id) }
+
+      try {
+        const result = await bookCollection.deleteOne(filter)
+        res.status(201).send(result);
+      }
+      catch (error) {
+        console.error(error);
+        res.status(500).send({ message: "Failed to add book" });
+      }
+    })
+
     app.get("/books", async (req, res) => {
 
       const query = {};
