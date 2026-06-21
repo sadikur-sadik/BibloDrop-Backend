@@ -33,13 +33,6 @@ async function run() {
 
 
 
-    app.get("/user", async (req, res) => {
-
-      const result = await userCollection.find().toArray()
-      res.send(result)
-
-    })
-
 
     app.post("/books", async (req, res) => {
       const newBook = req.body;
@@ -59,7 +52,35 @@ async function run() {
       }
     });
 
-    app.patch("/books/:id", async (req, res) => {
+    app.patch("/booksadmin/:id", async (req, res) => {
+      const { id } = req.params
+      const { status } = req.body;
+
+      let newStatus = ""
+
+      if (status == "publish") {
+        newStatus = true
+      }
+      else {
+        newStatus = false
+      }
+      const filter = { _id: new ObjectId(id) }
+      const update = {
+        $set: {
+          isPublished: newStatus
+        }
+      }
+
+      try {
+        const result = await bookCollection.updateOne(filter, update)
+        res.status(201).send(result);
+      }
+      catch (error) {
+        console.error(error);
+        res.status(500).send({ message: "Failed to add book" });
+      }
+    })
+    app.patch("/bookslibrarian/:id", async (req, res) => {
       const { id } = req.params
       const { status } = req.body;
 
@@ -91,7 +112,6 @@ async function run() {
       const { id } = req.params
       const {status} = req.body;
       let newPublish = ""
-      
       if (status == "pending") {
         newPublish = false
         
@@ -137,13 +157,85 @@ async function run() {
         res.status(500).send({ message: "Failed to add book" });
       }
     })
+    app.patch("/users/:id", async (req, res) => {
+      const { id } = req.params
+      const {role}= req.body;
+      let status =""
+      if(role!="librarian"){
+        status = null
+      }
+      else{
+        status = "pending"
+      }
+      const filter = { _id: new ObjectId(id) }
+      const update = {
+        $set: {
+          role: role,
+          status: status
+        }
+      }
 
-    app.delete("/books/:id", async (req, res) => {
+      try {
+        const result = await userCollection.updateOne(filter, update)
+        res.status(201).send(result);
+      }
+      catch (error) {
+        console.error(error);
+        res.status(500).send({ message: "Failed to add book" });
+      }
+    })
+    app.patch("/userslibrarian/:id", async (req, res) => {
+      const { id } = req.params
+      const {status}= req.body;
+      const filter = { _id: new ObjectId(id) }
+      const update = {
+        $set: {
+          status: status
+        }
+      }
+
+      try {
+        const result = await userCollection.updateOne(filter, update)
+        res.status(201).send(result);
+      }
+      catch (error) {
+        console.error(error);
+        res.status(500).send({ message: "Failed to add book" });
+      }
+    })
+
+    app.delete("/booksadmin/:id", async (req, res) => {
       const { id } = req.params
       const filter = { _id: new ObjectId(id) }
 
       try {
         const result = await bookCollection.deleteOne(filter)
+        res.status(201).send(result);
+      }
+      catch (error) {
+        console.error(error);
+        res.status(500).send({ message: "Failed to add book" });
+      }
+    })
+    app.delete("/bookslibrarian/:id", async (req, res) => {
+      const { id } = req.params
+      const filter = { _id: new ObjectId(id) }
+
+      try {
+        const result = await bookCollection.deleteOne(filter)
+        res.status(201).send(result);
+      }
+      catch (error) {
+        console.error(error);
+        res.status(500).send({ message: "Failed to add book" });
+      }
+    })
+    app.delete("/users/:id", async (req, res) => {
+      const { id } = req.params
+      const filter = { _id: new ObjectId(id) }
+
+      try {
+        const result = await userCollection.deleteOne(filter)
         res.status(201).send(result);
       }
       catch (error) {
@@ -167,6 +259,15 @@ async function run() {
         res.status(500).send({ message: "Failed to retrieve books" });
       }
     });
+
+    
+    app.get("/users", async (req, res) => {
+
+      const result = await userCollection.find().toArray()
+      res.send(result)
+
+    })
+
   } finally {
     // Ensures that the client will close when you finish/error
     // await client.close();
