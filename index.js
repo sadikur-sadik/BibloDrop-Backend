@@ -29,6 +29,7 @@ async function run() {
     const myDB = client.db("BibloDrop");
     const userCollection = myDB.collection("user")
     const bookCollection = myDB.collection("books")
+    const deliveryCollection = myDB.collection("delivery")
     console.log("Pinged your deployment. You successfully connected to MongoDB!");
 
 
@@ -51,6 +52,23 @@ async function run() {
         res.status(500).send({ message: "Failed to add book" });
       }
     });
+
+    app.post("/delivery",async (req, res) => {
+      const newDelivery = req.body;
+      if (newDelivery) {
+        newDelivery.deliveryStatus = "pending";
+        newDelivery.createdAt = new Date()
+      }
+
+      try {
+        const result = await deliveryCollection.insertOne(newDelivery);
+        res.status(201).send(result);
+      } catch (error) {
+        console.error(error);
+        res.status(500).send({ message: "Failed to add request" });
+      }
+
+    })
 
     app.patch("/booksadmin/:id", async (req, res) => {
       const { id } = req.params
@@ -259,6 +277,41 @@ async function run() {
         res.status(500).send({ message: "Failed to retrieve books" });
       }
     });
+    app.get("/delivery", async (req, res) => {
+
+      const query = {};
+
+      if (req.query.bookId) {
+        query.bookId = req.query.bookId
+      }
+      if(req.query.userId){
+        query.userId = req.query.userId
+      }
+      
+      try {
+        const result = await deliveryCollection.find(query).toArray();
+        res.send(result);
+      } catch (error) {
+        console.error(error);
+        res.status(500).send({ message: "Failed to retrieve books" });
+      }
+    });
+    app.get("/books/:id", async (req, res) => {
+      const { id } = req.params;
+      const filter = { _id: new ObjectId(id) }
+      try {
+        const result = await bookCollection.findOne(filter);
+
+        if (!result) {
+          return res.status(404).send({ message: "Book not found" });
+        }
+
+        res.send(result);
+      } catch (error) {
+        console.error(error);
+        res.status(500).send({ message: "Invalid ID or failed to retrieve book" });
+      }
+    });
 
     app.get("/allbooks", async (req, res) => {
       let sortOptions = {};
@@ -271,13 +324,13 @@ async function run() {
         setQuery.genre = query.category;
       }
 
-     if(query.availability){
-       if(query.availability == 'available' ){
-        setQuery.quantity = {$gte: 0}
-      } else if(query.availability == "unavailable"){
-        setQuery.quantity = 0
+      if (query.availability) {
+        if (query.availability == 'available') {
+          setQuery.quantity = { $gte: 0 }
+        } else if (query.availability == "unavailable") {
+          setQuery.quantity = 0
+        }
       }
-     }
       // 2. Filter: Search (Title or Author)
       if (query.search) {
         setQuery.$or = [
@@ -332,8 +385,11 @@ async function run() {
     });
 
     app.get("/users", async (req, res) => {
+      let query ={}
+        if (req.query.userId) {
+        query._id = new ObjectId(req.query.userId)}
 
-      const result = await userCollection.find().toArray()
+      const result = await userCollection.find(query).toArray()
       res.send(result)
 
     })
