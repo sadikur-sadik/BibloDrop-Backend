@@ -110,16 +110,16 @@ async function run() {
     })
     app.patch("/adminbooks/:id", async (req, res) => {
       const { id } = req.params
-      const {status} = req.body;
+      const { status } = req.body;
       let newPublish = ""
       if (status == "pending") {
         newPublish = false
-        
+
       }
-      else{
+      else {
         newPublish = true
       }
-      
+
       const filter = { _id: new ObjectId(id) }
       const update = {
         $set: {
@@ -141,8 +141,8 @@ async function run() {
 
     app.patch("/booksUpdate/:id", async (req, res) => {
       const { id } = req.params
-      const updateInfo= req.body;
-      
+      const updateInfo = req.body;
+
       const filter = { _id: new ObjectId(id) }
       const update = {
         $set: updateInfo
@@ -159,12 +159,12 @@ async function run() {
     })
     app.patch("/users/:id", async (req, res) => {
       const { id } = req.params
-      const {role}= req.body;
-      let status =""
-      if(role!="librarian"){
+      const { role } = req.body;
+      let status = ""
+      if (role != "librarian") {
         status = null
       }
-      else{
+      else {
         status = "pending"
       }
       const filter = { _id: new ObjectId(id) }
@@ -186,7 +186,7 @@ async function run() {
     })
     app.patch("/userslibrarian/:id", async (req, res) => {
       const { id } = req.params
-      const {status}= req.body;
+      const { status } = req.body;
       const filter = { _id: new ObjectId(id) }
       const update = {
         $set: {
@@ -260,7 +260,77 @@ async function run() {
       }
     });
 
-    
+    app.get("/allbooks", async (req, res) => {
+      let sortOptions = {};
+      const setQuery = {
+        isPublished: true,
+      };
+      const { query } = req;
+      // 1. Filter: Genre
+      if (query.category) {
+        setQuery.genre = query.category;
+      }
+
+     if(query.availability){
+       if(query.availability == 'available' ){
+        setQuery.quantity = {$gte: 0}
+      } else if(query.availability == "unavailable"){
+        setQuery.quantity = 0
+      }
+     }
+      // 2. Filter: Search (Title or Author)
+      if (query.search) {
+        setQuery.$or = [
+          { title: { $regex: query.search, $options: "i" } },
+          { author: { $regex: query.search, $options: "i" } }
+        ];
+      }
+
+      // 3. Filter: Delivery Fee
+      if (query.deliveryFee) {
+        const parts = query.deliveryFee.split('-');
+        let minFee;
+        let maxFee
+
+        // Check if parts[0] is "under"
+        if (parts[0].toLowerCase() === "under") {
+          minFee = 0;
+        } else {
+          minFee = parseFloat(parts[0]);
+        }
+        if (parts[1].toLowerCase() == "over") {
+          maxFee = 100000
+        } else {
+          maxFee = parseFloat(parts[1]);
+        }
+        // Add the range filter to setQuery
+        setQuery.deliveryFee = {
+          $gte: minFee,
+          $lte: maxFee
+        };
+      }
+
+      // 4. Sorting Logic
+      if (query.sort === 'az') {
+        sortOptions = { createdAt: 1 };
+      } else if (query.sort === 'za') {
+        sortOptions = { createdAt: -1 };
+      } else if (query.sort === "newest") {
+        const threeDaysAgo = new Date();
+        threeDaysAgo.setDate(threeDaysAgo.getDate() - 3);
+        setQuery.createdAt = { $gte: threeDaysAgo };
+      }
+
+      // 5. Execution (Always runs)
+      try {
+        const result = await bookCollection.find(setQuery).sort(sortOptions).toArray();
+        res.send(result);
+      } catch (error) {
+        console.error("Database Error:", error);
+        res.status(500).send({ message: "Failed to retrieve books" });
+      }
+    });
+
     app.get("/users", async (req, res) => {
 
       const result = await userCollection.find().toArray()
