@@ -63,7 +63,7 @@ async function run() {
 
 
     const verifyReader= async (req, res, next) => {
-      console.log(req.user.role);
+
       if (req.user.role != "reader") {
         return res.status(403).send({ message: "forbidden" })
       }
@@ -668,6 +668,22 @@ async function run() {
         const threeDaysAgo = new Date();
         threeDaysAgo.setDate(threeDaysAgo.getDate() - 3);
         setQuery.createdAt = { $gte: threeDaysAgo };
+      }
+
+      // pagination 
+      if(query.page){
+        const page = query.page
+        const perPage = query.perPage || 12
+        const skipItems = (page-1)*perPage
+
+      try {
+        const total = await bookCollection.countDocuments(setQuery)
+        const result = await bookCollection.find(setQuery).sort(sortOptions).skip(skipItems).limit(perPage).toArray();
+        return res.send({total,result});
+      } catch (error) {
+        console.error("Database Error:", error);
+        res.status(500).send({ message: "Failed to retrieve books" });
+      }
       }
 
       // 5. Execution (Always runs)
