@@ -296,6 +296,27 @@ async function run() {
         res.status(500).send({ message: "Failed to add book" });
       }
     })
+    app.patch("/reviewreader/:id", async (req, res) => {
+      const { id } = req.params
+      const { comment } = req.body;
+      const { rating } = req.body;
+      const filter = { _id: new ObjectId(id) }
+      const update = {
+        $set: {
+          comment: comment,
+           rating: rating
+        }
+      }
+
+      try {
+        const result = await reviewCollection.updateOne(filter, update)
+        res.status(201).send(result);
+      }
+      catch (error) {
+        console.error(error);
+        res.status(500).send({ message: "Failed to add book" });
+      }
+    })
 
     app.delete("/booksadmin/:id", async (req, res) => {
       const { id } = req.params
@@ -321,6 +342,19 @@ async function run() {
       catch (error) {
         console.error(error);
         res.status(500).send({ message: "Failed to add book" });
+      }
+    })
+    app.delete("/reviewreader/:id", async (req, res) => {
+      const { id } = req.params
+      const filter = { _id: new ObjectId(id) }
+
+      try {
+        const result = await reviewCollection.deleteOne(filter)
+        res.status(201).send(result);
+      }
+      catch (error) {
+        console.error(error);
+        res.status(500).send({ message: "failed to delete review" });
       }
     })
     app.delete("/users/:id", async (req, res) => {
@@ -390,6 +424,61 @@ async function run() {
         res.status(500).send({ message: "Failed to retrieve books" });
       }
     });
+
+    app.get("/deliveryreader", async (req, res) => {
+
+      const query = {};
+      if (req.query.userId) {
+        query.userId = req.query.userId
+      }
+
+      try {
+        const result = await deliveryCollection.find(query).toArray();
+        res.send(result);
+      } catch (error) {
+        console.error(error);
+        res.status(500).send({ message: "Failed to retrieve books" });
+      }
+    });
+
+    app.get("/readinglist", async (req, res) => {
+      const userId = req.query.userId;
+
+      if (!userId) {
+        return res.status(400).send({ message: "userId query parameter is required" });
+      }
+
+      try {
+        // Step 1: Fetch the delivery records for this user
+        const query = {
+          deliveryStatus: "delivered",
+          userId: userId
+        };
+        const deliveries = await deliveryCollection.find(query).toArray();
+
+        const books = [];
+
+        for (const delivery of deliveries) {
+          if (delivery.bookId) {
+            const bookObjectId = new ObjectId(delivery.bookId);
+
+            const book = await bookCollection.findOne({ _id: bookObjectId });
+
+            if (book) {
+              books.push(book);
+            }
+          }
+        }
+
+        res.send(books);
+
+      } catch (error) {
+        console.error("Error fetching reading list with loop:", error);
+        res.status(500).send({ message: "Failed to retrieve books" });
+      }
+    });
+
+
     app.get("/deliveryadmin", async (req, res) => {
       try {
         const result = await deliveryCollection.find().toArray();
@@ -406,6 +495,22 @@ async function run() {
       if (req.query.librarianId) {
         query.librarianId = req.query.librarianId
       }
+      if (req.query.userId) {
+        query.userId = req.query.userId
+      }
+
+      try {
+        const result = await reviewCollection.find(query).toArray();
+        res.send(result);
+      } catch (error) {
+        console.error(error);
+        res.status(500).send({ message: "Failed to retrieve books" });
+      }
+    });
+    
+    app.get("/readerallreview", async (req, res) => {
+
+      const query = {};
       if (req.query.userId) {
         query.userId = req.query.userId
       }
