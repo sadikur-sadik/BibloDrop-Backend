@@ -30,6 +30,7 @@ async function run() {
     const userCollection = myDB.collection("user")
     const bookCollection = myDB.collection("books")
     const deliveryCollection = myDB.collection("delivery")
+    const reviewCollection = myDB.collection("review")
     console.log("Pinged your deployment. You successfully connected to MongoDB!");
 
 
@@ -69,6 +70,40 @@ async function run() {
       }
 
     })
+ app.post("/review", async (req, res) => {
+      const newReview = req.body;
+
+      try {
+        const pipeline = [
+          {
+            $match: {
+              bookId: newReview.bookId,
+              userEmail: newReview.reviewerEmail
+            }
+          }
+        ];
+
+        const matchResult = await deliveryCollection.aggregate(pipeline).toArray();
+
+        const resultLength = matchResult.length > 0;
+
+        if (!resultLength) {
+          return res.status(403).send({ 
+            message: "You must purchase this book before writing a review." 
+          });
+        }
+
+        newReview.createdAt = new Date();
+        newReview.verified = true;
+
+        const result = await reviewCollection.insertOne(newReview);
+        res.status(201).send(result);
+
+      } catch (error) {
+        console.error(error);
+        res.status(500).send({ message: "Failed to add request" });
+      }
+    });
 
     app.patch("/booksadmin/:id", async (req, res) => {
       const { id } = req.params
@@ -393,6 +428,23 @@ async function run() {
       res.send(result)
 
     })
+
+
+    app.get("/adminusers", async (req, res) => {
+      const result = await userCollection.find().toArray()
+      res.send(result)
+
+    })
+    app.get("/reviews", async (req, res) => {
+      let query ={}
+        if (req.query.bookId) {
+        query.bookId = req.query.bookId}
+
+      const result = await reviewCollection.find(query).toArray()
+      res.send(result)
+
+    })
+
 
   } finally {
     // Ensures that the client will close when you finish/error
