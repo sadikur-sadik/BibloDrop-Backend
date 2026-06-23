@@ -331,6 +331,44 @@ async function run() {
         res.status(500).send({ message: "Failed to retrieve books" });
       }
     });
+    app.get("/deliveryrequests", async (req, res) => {
+
+      const query = {};
+
+      if (req.query.librarianId) {
+        query.librarianId = req.query.librarianId
+      }
+      if(req.query.userId){
+        query.userId = req.query.userId
+      }
+      
+      try {
+        const result = await deliveryCollection.find(query).toArray();
+        res.send(result);
+      } catch (error) {
+        console.error(error);
+        res.status(500).send({ message: "Failed to retrieve books" });
+      }
+    });
+    app.get("/librarianallreview", async (req, res) => {
+
+      const query = {};
+
+      if (req.query.librarianId) {
+        query.librarianId = req.query.librarianId
+      }
+      if(req.query.userId){
+        query.userId = req.query.userId
+      }
+      
+      try {
+        const result = await reviewCollection.find(query).toArray();
+        res.send(result);
+      } catch (error) {
+        console.error(error);
+        res.status(500).send({ message: "Failed to retrieve books" });
+      }
+    });
     app.get("/books/:id", async (req, res) => {
       const { id } = req.params;
       const filter = { _id: new ObjectId(id) }
