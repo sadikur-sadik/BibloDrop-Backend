@@ -31,12 +31,63 @@ async function run() {
     const bookCollection = myDB.collection("books")
     const deliveryCollection = myDB.collection("delivery")
     const reviewCollection = myDB.collection("review")
+    const sessionCollection = myDB.collection("session")
     console.log("Pinged your deployment. You successfully connected to MongoDB!");
 
+    
+    const verifyToken = async (req, res, next) => {
+
+      const rawToken = req.headers.authorization
+      
+      if (!rawToken) {
+        return res.status(401).send({ message: "unauthorized" })
+      }
+
+      const token = rawToken.split(" ")[1];
+
+      if (!token) {
+        return res.status(401).send({ message: "unauthorized" })
+      }
+
+      const query = { token: token }
+      const session = await sessionCollection.findOne(query)
+      const userQuery = {
+        _id: session?.userId
+      }
+      const user = await userCollection.findOne(userQuery)
+
+      req.user = user
+
+      next()
+    }
 
 
+    const verifyReader= async (req, res, next) => {
+      console.log(req.user.role);
+      if (req.user.role != "reader") {
+        return res.status(403).send({ message: "forbidden" })
+      }
+      else { next() }
+    }
+    const verifyAdmin = async (req, res, next) => {
 
-    app.post("/books", async (req, res) => {
+      if (req.user.role != "admin") {
+        return res.status(403).send({ message: "forbidden" })
+      }
+      else { next() }
+    }
+    const verifyLibrarian = async (req, res, next) => {
+
+      if (req.user.role != "librarian") {
+        return res.status(403).send({ message: "forbidden" })
+      }
+      else { next() }
+    }
+
+
+    // CRUD OPERATION STARTS
+
+    app.post("/books",verifyToken,verifyLibrarian, async (req, res) => {
       const newBook = req.body;
 
       if (newBook) {
@@ -54,7 +105,7 @@ async function run() {
       }
     });
 
-    app.post("/delivery", async (req, res) => {
+    app.post("/delivery",verifyToken, async (req, res) => {
       const newDelivery = req.body;
       if (newDelivery) {
         newDelivery.deliveryStatus = "pending";
@@ -70,7 +121,7 @@ async function run() {
       }
 
     })
-    app.post("/review", async (req, res) => {
+    app.post("/review",verifyToken, async (req, res) => {
       const newReview = req.body;
 
       try {
@@ -105,7 +156,7 @@ async function run() {
       }
     });
 
-    app.patch("/booksadmin/:id", async (req, res) => {
+    app.patch("/booksadmin/:id",verifyToken,verifyAdmin, async (req, res) => {
       const { id } = req.params
       const { status } = req.body;
 
@@ -133,7 +184,7 @@ async function run() {
         res.status(500).send({ message: "Failed to add book" });
       }
     })
-    app.patch("/bookslibrarian/:id", async (req, res) => {
+    app.patch("/bookslibrarian/:id",verifyToken,verifyLibrarian, async (req, res) => {
       const { id } = req.params
       const { status } = req.body;
 
@@ -161,7 +212,7 @@ async function run() {
         res.status(500).send({ message: "Failed to add book" });
       }
     })
-    app.patch("/adminbooks/:id", async (req, res) => {
+    app.patch("/adminbooks/:id",verifyToken,verifyAdmin, async (req, res) => {
       const { id } = req.params
       const { status } = req.body;
       let newPublish = ""
@@ -192,7 +243,7 @@ async function run() {
       }
     })
 
-    app.patch("/booksUpdate/:id", async (req, res) => {
+    app.patch("/booksupdate/:id",verifyToken,verifyLibrarian, async (req, res) => {
       const { id } = req.params
       const updateInfo = req.body;
 
@@ -210,7 +261,7 @@ async function run() {
         res.status(500).send({ message: "Failed to add book" });
       }
     })
-    app.patch("/users/:id", async (req, res) => {
+    app.patch("/usersrole/:id",verifyToken,verifyAdmin, async (req, res) => {
       const { id } = req.params
       const { role } = req.body;
       let status = ""
@@ -237,7 +288,7 @@ async function run() {
         res.status(500).send({ message: "Failed to add book" });
       }
     })
-    app.patch("/quantity/:id", async (req, res) => {
+    app.patch("/quantity/:id",verifyToken, async (req, res) => {
       const { id } = req.params;
 
       const filter = { _id: new ObjectId(id), quantity: { $gt: 0 } };
@@ -258,7 +309,7 @@ async function run() {
         res.status(500).send({ message: "Failed to update quantity" });
       }
     });
-    app.patch("/userslibrarian/:id", async (req, res) => {
+    app.patch("/approvelibrarian/:id",verifyToken,verifyAdmin, async (req, res) => {
       const { id } = req.params
       const { status } = req.body;
       const filter = { _id: new ObjectId(id) }
@@ -277,7 +328,7 @@ async function run() {
         res.status(500).send({ message: "Failed to add book" });
       }
     })
-    app.patch("/deliverylevelup/:id", async (req, res) => {
+    app.patch("/deliverylevelup/:id",verifyToken,verifyLibrarian, async (req, res) => {
       const { id } = req.params
       const { status } = req.body;
       const filter = { _id: new ObjectId(id) }
@@ -296,7 +347,7 @@ async function run() {
         res.status(500).send({ message: "Failed to add book" });
       }
     })
-    app.patch("/reviewreader/:id", async (req, res) => {
+    app.patch("/reviewreader/:id",verifyToken,verifyReader, async (req, res) => {
       const { id } = req.params
       const { comment } = req.body;
       const { rating } = req.body;
@@ -318,7 +369,7 @@ async function run() {
       }
     })
 
-    app.delete("/booksadmin/:id", async (req, res) => {
+    app.delete("/booksadmin/:id",verifyToken,verifyAdmin, async (req, res) => {
       const { id } = req.params
       const filter = { _id: new ObjectId(id) }
 
@@ -331,7 +382,7 @@ async function run() {
         res.status(500).send({ message: "Failed to add book" });
       }
     })
-    app.delete("/bookslibrarian/:id", async (req, res) => {
+    app.delete("/bookslibrarian/:id",verifyToken,verifyLibrarian, async (req, res) => {
       const { id } = req.params
       const filter = { _id: new ObjectId(id) }
 
@@ -344,7 +395,7 @@ async function run() {
         res.status(500).send({ message: "Failed to add book" });
       }
     })
-    app.delete("/reviewreader/:id", async (req, res) => {
+    app.delete("/reviewreader/:id",verifyToken,verifyReader, async (req, res) => {
       const { id } = req.params
       const filter = { _id: new ObjectId(id) }
 
@@ -357,7 +408,7 @@ async function run() {
         res.status(500).send({ message: "failed to delete review" });
       }
     })
-    app.delete("/users/:id", async (req, res) => {
+    app.delete("/users/:id",verifyToken,verifyAdmin, async (req, res) => {
       const { id } = req.params
       const filter = { _id: new ObjectId(id) }
 
@@ -371,7 +422,7 @@ async function run() {
       }
     })
 
-    app.get("/books", async (req, res) => {
+    app.get("/bookslibrarian",verifyToken,verifyLibrarian, async (req, res) => {
 
       const query = {};
 
@@ -405,7 +456,7 @@ async function run() {
         res.status(500).send({ message: "Failed to retrieve books" });
       }
     });
-    app.get("/deliveryrequests", async (req, res) => {
+    app.get("/deliveryrequests", verifyToken,verifyLibrarian,async (req, res) => {
 
       const query = {};
 
@@ -425,7 +476,7 @@ async function run() {
       }
     });
 
-    app.get("/deliveryreader", async (req, res) => {
+    app.get("/deliveryreader",verifyToken,verifyReader, async (req, res) => {
 
       const query = {};
       if (req.query.userId) {
@@ -441,7 +492,7 @@ async function run() {
       }
     });
 
-    app.get("/readinglist", async (req, res) => {
+    app.get("/readinglist",verifyToken,verifyReader, async (req, res) => {
       const userId = req.query.userId;
 
       if (!userId) {
@@ -449,7 +500,6 @@ async function run() {
       }
 
       try {
-        // Step 1: Fetch the delivery records for this user
         const query = {
           deliveryStatus: "delivered",
           userId: userId
@@ -479,7 +529,7 @@ async function run() {
     });
 
 
-    app.get("/deliveryadmin", async (req, res) => {
+    app.get("/deliveryadmin",verifyToken,verifyAdmin, async (req, res) => {
       try {
         const result = await deliveryCollection.find().toArray();
         res.send(result);
@@ -488,7 +538,7 @@ async function run() {
         res.status(500).send({ message: "Failed to retrieve books" });
       }
     });
-    app.get("/librarianallreview", async (req, res) => {
+    app.get("/librarianallreview",verifyToken,verifyLibrarian, async (req, res) => {
 
       const query = {};
 
@@ -508,7 +558,7 @@ async function run() {
       }
     });
     
-    app.get("/readerallreview", async (req, res) => {
+    app.get("/readerallreview",verifyToken,verifyReader, async (req, res) => {
 
       const query = {};
       if (req.query.userId) {
@@ -533,7 +583,7 @@ async function run() {
       res.send(result)
 
     })
-    app.get("/allreviews", async (req, res) => {
+    app.get("/allreviews",verifyToken,verifyAdmin, async (req, res) => {
       try {
         const result = await reviewCollection.find().toArray();
         res.send(result);
@@ -642,13 +692,13 @@ async function run() {
     })
 
 
-    app.get("/adminusers", async (req, res) => {
+    app.get("/adminusers",verifyToken,verifyAdmin, async (req, res) => {
       const result = await userCollection.find().toArray()
       res.send(result)
 
     })
 
-    app.get("/booksadmin", async (req, res) => {
+    app.get("/booksadmin",verifyToken,verifyAdmin, async (req, res) => {
       const result = await bookCollection.find().toArray()
       res.send(result)
     })
