@@ -54,7 +54,7 @@ async function run() {
       }
     });
 
-    app.post("/delivery",async (req, res) => {
+    app.post("/delivery", async (req, res) => {
       const newDelivery = req.body;
       if (newDelivery) {
         newDelivery.deliveryStatus = "pending";
@@ -70,7 +70,7 @@ async function run() {
       }
 
     })
- app.post("/review", async (req, res) => {
+    app.post("/review", async (req, res) => {
       const newReview = req.body;
 
       try {
@@ -88,8 +88,8 @@ async function run() {
         const resultLength = matchResult.length > 0;
 
         if (!resultLength) {
-          return res.status(403).send({ 
-            message: "You must purchase this book before writing a review." 
+          return res.status(403).send({
+            message: "You must purchase this book before writing a review."
           });
         }
 
@@ -256,6 +256,25 @@ async function run() {
         res.status(500).send({ message: "Failed to add book" });
       }
     })
+    app.patch("/deliverylevelup/:id", async (req, res) => {
+      const { id } = req.params
+      const { status } = req.body;
+      const filter = { _id: new ObjectId(id) }
+      const update = {
+        $set: {
+          deliveryStatus: status
+        }
+      }
+
+      try {
+        const result = await deliveryCollection.updateOne(filter, update)
+        res.status(201).send(result);
+      }
+      catch (error) {
+        console.error(error);
+        res.status(500).send({ message: "Failed to add book" });
+      }
+    })
 
     app.delete("/booksadmin/:id", async (req, res) => {
       const { id } = req.params
@@ -319,10 +338,10 @@ async function run() {
       if (req.query.bookId) {
         query.bookId = req.query.bookId
       }
-      if(req.query.userId){
+      if (req.query.userId) {
         query.userId = req.query.userId
       }
-      
+
       try {
         const result = await deliveryCollection.find(query).toArray();
         res.send(result);
@@ -338,10 +357,10 @@ async function run() {
       if (req.query.librarianId) {
         query.librarianId = req.query.librarianId
       }
-      if(req.query.userId){
+      if (req.query.userId) {
         query.userId = req.query.userId
       }
-      
+
       try {
         const result = await deliveryCollection.find(query).toArray();
         res.send(result);
@@ -357,10 +376,10 @@ async function run() {
       if (req.query.librarianId) {
         query.librarianId = req.query.librarianId
       }
-      if(req.query.userId){
+      if (req.query.userId) {
         query.userId = req.query.userId
       }
-      
+
       try {
         const result = await reviewCollection.find(query).toArray();
         res.send(result);
@@ -458,9 +477,10 @@ async function run() {
     });
 
     app.get("/users", async (req, res) => {
-      let query ={}
-        if (req.query.userId) {
-        query._id = new ObjectId(req.query.userId)}
+      let query = {}
+      if (req.query.userId) {
+        query._id = new ObjectId(req.query.userId)
+      }
 
       const result = await userCollection.find(query).toArray()
       res.send(result)
@@ -474,9 +494,10 @@ async function run() {
 
     })
     app.get("/reviews", async (req, res) => {
-      let query ={}
-        if (req.query.bookId) {
-        query.bookId = req.query.bookId}
+      let query = {}
+      if (req.query.bookId) {
+        query.bookId = req.query.bookId
+      }
 
       const result = await reviewCollection.find(query).toArray()
       res.send(result)
