@@ -237,6 +237,27 @@ async function run() {
         res.status(500).send({ message: "Failed to add book" });
       }
     })
+    app.patch("/quantity/:id", async (req, res) => {
+      const { id } = req.params;
+
+      const filter = { _id: new ObjectId(id), quantity: { $gt: 0 } };
+      const update = {
+        $inc: { quantity: -1 }
+      };
+
+      try {
+        const result = await bookCollection.updateOne(filter, update);
+
+        if (result.matchedCount === 0) {
+          return res.status(404).send({ message: "Book not found or out of stock" });
+        }
+
+        res.status(200).send(result);
+      } catch (error) {
+        console.error(error);
+        res.status(500).send({ message: "Failed to update quantity" });
+      }
+    });
     app.patch("/userslibrarian/:id", async (req, res) => {
       const { id } = req.params
       const { status } = req.body;
@@ -369,6 +390,15 @@ async function run() {
         res.status(500).send({ message: "Failed to retrieve books" });
       }
     });
+    app.get("/deliveryadmin", async (req, res) => {
+      try {
+        const result = await deliveryCollection.find().toArray();
+        res.send(result);
+      } catch (error) {
+        console.error(error);
+        res.status(500).send({ message: "Failed to retrieve books" });
+      }
+    });
     app.get("/librarianallreview", async (req, res) => {
 
       const query = {};
@@ -382,6 +412,25 @@ async function run() {
 
       try {
         const result = await reviewCollection.find(query).toArray();
+        res.send(result);
+      } catch (error) {
+        console.error(error);
+        res.status(500).send({ message: "Failed to retrieve books" });
+      }
+    });
+    app.get("/reviews", async (req, res) => {
+      let query = {}
+      if (req.query.bookId) {
+        query.bookId = req.query.bookId
+      }
+
+      const result = await reviewCollection.find(query).toArray()
+      res.send(result)
+
+    })
+    app.get("/allreviews", async (req, res) => {
+      try {
+        const result = await reviewCollection.find().toArray();
         res.send(result);
       } catch (error) {
         console.error(error);
@@ -493,16 +542,12 @@ async function run() {
       res.send(result)
 
     })
-    app.get("/reviews", async (req, res) => {
-      let query = {}
-      if (req.query.bookId) {
-        query.bookId = req.query.bookId
-      }
 
-      const result = await reviewCollection.find(query).toArray()
+    app.get("/booksadmin", async (req, res) => {
+      const result = await bookCollection.find().toArray()
       res.send(result)
-
     })
+
 
 
   } finally {
