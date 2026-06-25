@@ -25,7 +25,7 @@ async function run() {
     // Connect the client to the server	(optional starting in v4.7)
     await client.connect();
     // Send a ping to confirm a successful connection
-    await client.db("admin").command({ ping: 1 });
+    // await client.db("admin").command({ ping: 1 });
     const myDB = client.db("BibloDrop");
     const userCollection = myDB.collection("user")
     const bookCollection = myDB.collection("books")
