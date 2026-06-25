@@ -20,10 +20,11 @@ const client = new MongoClient(uri, {
   }
 });
 
-async function run() {
-  try {
+  client.connect(()=>{console.log("Connecting to MongoDB")}).catch(console.dir)
+// async function run() {
+//   try {
     // Connect the client to the server	(optional starting in v4.7)
-    await client.connect();
+    // await client.connect();
     // Send a ping to confirm a successful connection
     // await client.db("admin").command({ ping: 1 });
     const myDB = client.db("BibloDrop");
@@ -719,12 +720,12 @@ async function run() {
       const result = await bookCollection.find().toArray()
       res.send(result)
     })
-  } finally {
-    // Ensures that the client will close when you finish/error
-    // await client.close();
-  }
-}
-run().catch(console.dir);
+//   } finally {
+//     // Ensures that the client will close when you finish/error
+//     // await client.close();
+//   }
+// }
+// run().catch(console.dir);
 
 
 
@@ -737,3 +738,4 @@ app.listen(port, () => {
   console.log(`Example app listening on port ${port}`)
 })
 
+module.exports = app
