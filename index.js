@@ -7,7 +7,7 @@ dotenv.config();
 
 app.use(cors())
 app.use(express.json());
-const port = process.env.PORT
+const port = process.env.PORT || 5000;
 
 const uri = process.env.MONGO_DB;
 
@@ -20,7 +20,7 @@ const client = new MongoClient(uri, {
   }
 });
 
-client.connect(() => { console.log("Connecting to MongoDB") }).catch(console.dir)
+client.connect().then(() => console.log("Connecting to MongoDB")).catch(console.dir);
 // async function run() {
 //   try {
 // Connect the client to the server	(optional starting in v4.7)
@@ -33,57 +33,70 @@ const bookCollection = myDB.collection("books")
 const deliveryCollection = myDB.collection("delivery")
 const reviewCollection = myDB.collection("review")
 const sessionCollection = myDB.collection("session")
+const notificationCollection = myDB.collection("notification")
 console.log("Pinged your deployment. You successfully connected to MongoDB!");
 
 
 const verifyToken = async (req, res, next) => {
+  try {
+    const rawToken = req.headers.authorization;
 
-  const rawToken = req.headers.authorization
+    if (!rawToken) {
+      return res.status(401).send({ message: "unauthorized" });
+    }
 
-  if (!rawToken) {
-    return res.status(401).send({ message: "unauthorized" })
+    const token = rawToken.split(" ")[1];
+
+    if (!token) {
+      return res.status(401).send({ message: "unauthorized" });
+    }
+
+    const query = { token: token };
+    const session = await sessionCollection.findOne(query);
+
+    if (!session || !session.userId) {
+      return res.status(401).send({ message: "unauthorized" });
+    }
+
+    let userQuery = {};
+    try {
+      userQuery = { _id: typeof session.userId === 'string' ? new ObjectId(session.userId) : session.userId };
+    } catch {
+      userQuery = { _id: session.userId };
+    }
+
+    const user = await userCollection.findOne(userQuery);
+
+    if (!user) {
+      return res.status(401).send({ message: "unauthorized" });
+    }
+
+    req.user = user;
+    next();
+  } catch (error) {
+    console.error("verifyToken error:", error);
+    return res.status(401).send({ message: "unauthorized" });
   }
-
-  const token = rawToken.split(" ")[1];
-
-  if (!token) {
-    return res.status(401).send({ message: "unauthorized" })
-  }
-
-  const query = { token: token }
-  const session = await sessionCollection.findOne(query)
-  const userQuery = {
-    _id: session?.userId
-  }
-  const user = await userCollection.findOne(userQuery)
-
-  req.user = user
-
-  next()
-}
-
+};
 
 const verifyReader = async (req, res, next) => {
-
-  if (req.user.role != "reader") {
-    return res.status(403).send({ message: "forbidden" })
+  if (!req.user || req.user.role !== "reader") {
+    return res.status(403).send({ message: "forbidden" });
   }
-  else { next() }
-}
+  next();
+};
 const verifyAdmin = async (req, res, next) => {
-
-  if (req.user.role != "admin") {
-    return res.status(403).send({ message: "forbidden" })
+  if (!req.user || req.user.role !== "admin") {
+    return res.status(403).send({ message: "forbidden" });
   }
-  else { next() }
-}
+  next();
+};
 const verifyLibrarian = async (req, res, next) => {
-
-  if (req.user.role != "librarian") {
-    return res.status(403).send({ message: "forbidden" })
+  if (!req.user || req.user.role !== "librarian") {
+    return res.status(403).send({ message: "forbidden" });
   }
-  else { next() }
-}
+  next();
+};
 
 
 // CRUD OPERATION STARTS
@@ -99,6 +112,34 @@ app.post("/books", verifyToken, verifyLibrarian, async (req, res) => {
 
   try {
     const result = await bookCollection.insertOne(newBook);
+
+    // Admin Notification Trigger for New Book Submission
+    await notificationCollection.insertOne({
+      recipientEmail: "admin",
+      recipientRole: "admin",
+      type: "NEW_BOOK_SUBMITTED",
+      title: "Pending Approval Request",
+      message: `${newBook.librarianEmail || req.user?.email || "A librarian"} submitted '${newBook.title}' for catalog approval.`,
+      link: "/dashboard/admin/manage-books",
+      isRead: false,
+      createdAt: new Date()
+    });
+
+    res.status(201).send(result);
+  } catch (error) {
+    console.error(error);
+    res.status(500).send({ message: "Failed to add book" });
+  }
+});
+app.post("/notifications", async (req, res) => {
+  const notification = req.body;
+
+  if (notification) {
+    notification.createdAt = new Date()
+  }
+
+  try {
+    const result = await notificationCollection.insertOne(notification);
     res.status(201).send(result);
   } catch (error) {
     console.error(error);
@@ -116,6 +157,19 @@ app.post("/delivery", verifyToken, async (req, res) => {
 
   try {
     const result = await deliveryCollection.insertOne(newDelivery);
+
+    // Librarian Notification Trigger for New Order Request
+    await notificationCollection.insertOne({
+      recipientEmail: newDelivery.librarianEmail || "librarian",
+      recipientRole: "librarian",
+      type: "ORDER_PLACED",
+      title: "New Delivery Request!",
+      message: `${newDelivery.userName || newDelivery.userEmail || "A reader"} ordered ${newDelivery.bookTitle || "a book"}.`,
+      link: "/dashboard/librarian/manage-deliveries",
+      isRead: false,
+      createdAt: new Date()
+    });
+
     res.status(201).send(result);
   } catch (error) {
     console.error(error);
@@ -283,6 +337,21 @@ app.patch("/usersrole/:id", verifyToken, verifyAdmin, async (req, res) => {
 
   try {
     const result = await userCollection.updateOne(filter, update)
+
+    if (role === "librarian") {
+      // Admin Notification Trigger for Librarian Role Request
+      await notificationCollection.insertOne({
+        recipientEmail: "admin",
+        recipientRole: "admin",
+        type: "LIBRARIAN_REQUEST",
+        title: "Librarian Role Request",
+        message: "A new user requested librarian role verification.",
+        link: "/dashboard/admin/approvals",
+        isRead: false,
+        createdAt: new Date()
+      });
+    }
+
     res.status(201).send(result);
   }
   catch (error) {
@@ -341,7 +410,35 @@ app.patch("/deliverylevelup/:id", verifyToken, verifyLibrarian, async (req, res)
   }
 
   try {
+    const existingDelivery = await deliveryCollection.findOne(filter);
     const result = await deliveryCollection.updateOne(filter, update)
+
+    if (existingDelivery) {
+      if (status === "shipped" || status === "out for delivery") {
+        await notificationCollection.insertOne({
+          recipientEmail: existingDelivery.userEmail,
+          recipientRole: "reader",
+          type: "ORDER_DISPATCHED",
+          title: "Order Dispatched!",
+          message: `Your order for ${existingDelivery.bookTitle || "your book"} is on its way.`,
+          link: "/dashboard/reader/delivery-history",
+          isRead: false,
+          createdAt: new Date()
+        });
+      } else if (status === "delivered") {
+        await notificationCollection.insertOne({
+          recipientEmail: existingDelivery.userEmail,
+          recipientRole: "reader",
+          type: "ORDER_DELIVERED",
+          title: "Book Delivered!",
+          message: `${existingDelivery.bookTitle || "Your book"} has been delivered. Enjoy reading!`,
+          link: "/dashboard/reader/reading-list",
+          isRead: false,
+          createdAt: new Date()
+        });
+      }
+    }
+
     res.status(201).send(result);
   }
   catch (error) {
@@ -729,6 +826,62 @@ app.get("/booksadmin", verifyToken, verifyAdmin, async (req, res) => {
   const result = await bookCollection.find().toArray()
   res.send(result)
 })
+
+app.get("/notifications", verifyToken, async (req, res) => {
+  try {
+    const userEmail = req.user?.email;
+    const userRole = req.user?.role;
+
+    const query = {
+      $or: [
+        { recipientEmail: userEmail },
+        { recipientRole: userRole },
+        ...(userRole === "admin" ? [{ recipientEmail: "admin" }] : [])
+      ]
+    };
+
+    const notifications = await notificationCollection
+      .find(query)
+      .sort({ createdAt: -1 })
+      .limit(5)
+      .toArray();
+
+    const unreadCount = await notificationCollection.countDocuments({
+      ...query,
+      isRead: false
+    });
+
+    res.send({ notifications, unreadCount });
+  } catch (error) {
+    console.error("Failed to fetch notifications:", error);
+    res.status(500).send({ message: "Failed to fetch notifications" });
+  }
+});
+
+app.patch("/notifications/mark-as-read", verifyToken, async (req, res) => {
+  try {
+    const userEmail = req.user?.email;
+    const userRole = req.user?.role;
+
+    const query = {
+      $or: [
+        { recipientEmail: userEmail },
+        { recipientRole: userRole },
+        ...(userRole === "admin" ? [{ recipientEmail: "admin" }] : [])
+      ],
+      isRead: false
+    };
+
+    const result = await notificationCollection.updateMany(query, {
+      $set: { isRead: true }
+    });
+
+    res.send({ message: "Notifications marked as read", result });
+  } catch (error) {
+    console.error("Failed to mark notifications as read:", error);
+    res.status(500).send({ message: "Failed to update notifications" });
+  }
+});
 //   } finally {
 //     // Ensures that the client will close when you finish/error
 //     // await client.close();
