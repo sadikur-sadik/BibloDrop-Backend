@@ -20,9 +20,24 @@ const client = new MongoClient(uri, {
   }
 });
 
-client.connect().catch(err => console.error("MongoDB Connection Error:", err));
-// async function run() {
-//   try {
+let clientPromise = null;
+
+const connectDB = async (req, res, next) => {
+  try {
+    if (!clientPromise) {
+      clientPromise = client.connect();
+    }
+    await clientPromise;
+    next();
+  } catch (error) {
+    console.error("MongoDB Connection Error in middleware:", error);
+    clientPromise = null;
+    res.status(500).send({ message: "Database connection failed", details: error?.message || String(error) });
+  }
+};
+
+app.use(connectDB);
+
 // Connect the client to the server	(optional starting in v4.7)
 // await client.connect();
 // Send a ping to confirm a successful connection
@@ -818,7 +833,7 @@ app.get("/featuredbooks", async (req, res) => {
     res.send(result);
   } catch (error) {
     console.error("Error fetching featured books:", error);
-    res.status(500).send({ message: "Internal Server Error" });
+    res.status(500).send({ message: "Internal Server Error", details: error?.message || String(error) });
   }
 });
 
