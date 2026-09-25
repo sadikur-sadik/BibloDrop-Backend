@@ -9,18 +9,18 @@ app.use(cors())
 app.use(express.json());
 const port = process.env.PORT || 5000;
 
-const uri = process.env.MONGO_DB;
+const uri = (process.env.MONGO_DB || "mongodb+srv://biblodrop:txSPVmHyK4KhttJb@cluster0.z8tyxup.mongodb.net/?appName=Cluster0").trim();
 
 // Create a MongoClient with a MongoClientOptions object to set the Stable API version
 const client = new MongoClient(uri, {
   serverApi: {
     version: ServerApiVersion.v1,
-    strict: true,
+    strict: false,
     deprecationErrors: true,
   }
 });
 
-client.connect().then(() => console.log("Connecting to MongoDB")).catch(console.dir);
+client.connect().catch(err => console.error("MongoDB Connection Error:", err));
 // async function run() {
 //   try {
 // Connect the client to the server	(optional starting in v4.7)
