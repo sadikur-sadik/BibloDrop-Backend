@@ -706,6 +706,94 @@ app.get("/allreviews", verifyToken, verifyAdmin, async (req, res) => {
     res.status(500).send({ message: "Failed to retrieve books" });
   }
 });
+
+app.get('/community-feed', async (req, res) => {
+  try {
+    const pipeline = [
+      // 1. Fetch top 12 most recent reviews
+      { $sort: { createdAt: -1 } },
+      { $limit: 12 },
+
+      // 2. Convert string bookId to ObjectId (if stored as string) and join 'books' collection
+      {
+        $addFields: {
+          bookObjectId: {
+            $convert: {
+              input: "$bookId",
+              to: "objectId",
+              onError: "$bookId",
+              onNull: "$bookId"
+            }
+          }
+        }
+      },
+      {
+        $lookup: {
+          from: "books",
+          localField: "bookObjectId",
+          foreignField: "_id",
+          as: "bookInfo"
+        }
+      },
+      { $unwind: { path: "$bookInfo", preserveNullAndEmptyArrays: true } },
+
+      // 3. Lookup User Profile for Avatar & Full Name
+      {
+        $lookup: {
+          from: "user",
+          localField: "reviewerEmail",
+          foreignField: "email",
+          as: "userInfo"
+        }
+      },
+      { $unwind: { path: "$userInfo", preserveNullAndEmptyArrays: true } },
+
+      // 4. Verify Delivery Record (Cross-check delivery collection for 'delivered' status)
+      {
+        $lookup: {
+          from: "delivery",
+          let: { rEmail: "$reviewerEmail", bId: "$bookId" },
+          pipeline: [
+            {
+              $match: {
+                $expr: {
+                  $and: [
+                    { $eq: ["$userEmail", "$$rEmail"] },
+                    { $eq: ["$bookId", "$$bId"] },
+                    { $eq: ["$deliveryStatus", "delivered"] }
+                  ]
+                }
+              }
+            }
+          ],
+          as: "verifiedDelivery"
+        }
+      },
+
+      // 5. Project Clean DTO
+      {
+        $project: {
+          _id: 1,
+          reviewerName: { $ifNull: ["$userInfo.name", "$reviewerName"] },
+          reviewerImage: { $ifNull: ["$userInfo.image", "https://images.unsplash.com/photo-1534528741775-53994a69daeb?auto=format&fit=crop&q=80&w=250"] },
+          bookId: 1,
+          bookTitle: { $ifNull: ["$bookInfo.title", "Unknown Book"] },
+          bookCover: "$bookInfo.coverImage",
+          rating: 1,
+          comment: 1,
+          createdAt: 1,
+          isVerified: { $gt: [{ $size: "$verifiedDelivery" }, 0] }
+        }
+      }
+    ];
+
+    const feed = await reviewCollection.aggregate(pipeline).toArray();
+    res.status(200).json({ success: true, data: feed });
+  } catch (error) {
+    console.error("Community Feed Aggregation Error:", error);
+    res.status(500).json({ success: false, message: "Server Error fetching feed" });
+  }
+});
 app.get("/books/:id", async (req, res) => {
   const { id } = req.params;
   const filter = { _id: new ObjectId(id) }
